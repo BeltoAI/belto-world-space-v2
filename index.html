@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#050507" />
+<title>belto — Orbital Edge AI Runtime</title>
+<meta name="description" content="belto runs mission AI onboard satellites and constrained edge systems, turning raw sensor streams into compact, downlink-ready insight." />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['var(--font-aeonik)', 'system-ui', 'sans-serif'],
+          mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          ink: { 950: '#050507', 900: '#08080b', 800: '#0d0d11', 700: '#15151a', 600: '#1d1d23', 500: '#26262d' },
+          moss: { 900: '#0a1d14', 800: '#102b1d', 700: '#173a28', 600: '#1f5238', 500: '#2a724e', 400: '#4ade80' },
+        },
+        letterSpacing: { tightest: '-0.04em', xtight: '-0.035em' },
+      },
+    },
+  };
+</script>
+<style>
+  :root {
+    --font-aeonik: 'aeonik', 'aeonik Fallback';
+    --font-mono: 'mono', 'mono Fallback';
+  }
+  html, body { background: #050507; color: #fff; }
+  body { font-family: var(--font-aeonik), system-ui, sans-serif; font-feature-settings: "ss01", "cv11"; -webkit-font-smoothing: antialiased; }
+
+  /* Eyebrow label with corner-bracket */
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.45);
+  }
+  .eyebrow::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    background: linear-gradient(135deg, currentColor 50%, transparent 50%);
+    opacity: 0.7;
+  }
+
+  /* Faint background grid */
+  .grid-overlay {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  }
+
+  .hero-bg {
+    background:
+      radial-gradient(ellipse 90% 50% at 50% 110%, rgba(70,110,180,0.30) 0%, rgba(40,60,110,0.12) 35%, transparent 70%),
+      radial-gradient(ellipse 60% 40% at 70% 25%, rgba(120,90,200,0.10) 0%, transparent 60%),
+      linear-gradient(180deg, #02020a 0%, #05050a 55%, #08081a 100%);
+  }
+
+  /* Buttons */
+  .btn-primary {
+    background: #173a28;
+    color: white;
+    padding: 14px 22px;
+    border-radius: 10px;
+    font-weight: 500;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background .25s ease, transform .25s ease;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+  }
+  .btn-primary:hover { background: #1f5238; }
+  .btn-secondary {
+    background: rgba(255,255,255,0.02);
+    color: white;
+    padding: 14px 22px;
+    border-radius: 10px;
+    font-weight: 500;
+    font-size: 14px;
+    border: 1px solid rgba(255,255,255,0.14);
+    transition: background .25s ease, border-color .25s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.28); }
+  .btn-ghost {
+    color: rgba(255,255,255,0.7);
+    font-weight: 500;
+    font-size: 14px;
+    padding: 14px 8px;
+    transition: color .25s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-ghost:hover { color: white; }
+
+  /* Cards */
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.028) 0%, rgba(255,255,255,0.005) 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 32px;
+    transition: border-color .35s ease, transform .35s ease, background .35s ease;
+  }
+  .card:hover { border-color: rgba(255,255,255,0.20); background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%); }
+
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent);
+  }
+
+  /* Subtle motion */
+  @keyframes floaty { 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-8px); } }
+  .floaty { animation: floaty 7s ease-in-out infinite; }
+  @keyframes twinkle { 0%,100%{ opacity:.25 } 50%{ opacity:.85 } }
+  .twinkle { animation: twinkle 4s ease-in-out infinite; }
+  @keyframes pulseDot { 0%,100%{ box-shadow: 0 0 0 0 rgba(74,222,128,.55); } 70%{ box-shadow: 0 0 0 6px rgba(74,222,128,0); } }
+  .pulse-dot { animation: pulseDot 2.4s ease-in-out infinite; }
+
+  /* Fade-in on scroll */
+  .reveal { opacity: 0; transform: translateY(20px); transition: opacity .9s ease, transform .9s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* Demo dashboard mono styling */
+  .demo-mono { font-family: var(--font-mono), ui-monospace, monospace; }
+
+  /* Hide scrollbar for horizontal scroll containers if needed */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  /* Nav blur fallback */
+  .nav-bg { backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); background: rgba(5,5,7,0.62); }
+
+  /* Selection */
+  ::selection { background: rgba(74,222,128,0.25); color: #fff; }
+
+  /* Hero Earth: sized in vh so the curve sits at a consistent hero-relative position
+     across viewports. On phone/tablet: small crescent at the bottom.
+     On laptop+: dramatic zoom — image is ~3x larger, mostly off-screen below,
+     so only the upper portion of the planet shows, just below the subheadline. */
+  .hero-earth-wrap {
+    width: max(100vw, 147vh);
+    height: 58vh;
+    bottom: 0;
+  }
+  .hero-earth-img {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, transparent 12%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.92) 46%, black 60%, black 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, transparent 12%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.92) 46%, black 60%, black 100%);
+  }
+  @media (min-width: 1024px) {
+    .hero-earth-wrap {
+      width: max(100vw, 441vh);
+      height: 180vh;
+      bottom: -76vh;
+    }
+    .hero-earth-img {
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, transparent 28%, rgba(0,0,0,0.55) 30.5%, rgba(0,0,0,0.95) 39%, black 48%, black 100%);
+      mask-image: linear-gradient(to bottom, transparent 0%, transparent 28%, rgba(0,0,0,0.55) 30.5%, rgba(0,0,0,0.95) 39%, black 48%, black 100%);
+    }
+  }
+
+  /* Schematic corner brackets used decoratively */
+  .bracket-tl { border-top: 1px solid rgba(255,255,255,.18); border-left: 1px solid rgba(255,255,255,.18); }
+  .bracket-tr { border-top: 1px solid rgba(255,255,255,.18); border-right: 1px solid rgba(255,255,255,.18); }
+  .bracket-bl { border-bottom: 1px solid rgba(255,255,255,.18); border-left: 1px solid rgba(255,255,255,.18); }
+  .bracket-br { border-bottom: 1px solid rgba(255,255,255,.18); border-right: 1px solid rgba(255,255,255,.18); }
+
+  /* Use-case carousel */
+  .carousel-track {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-inline: 1.5rem;
+    padding-block: 0.5rem;
+    scroll-padding-inline: 1.5rem;
+  }
+  .carousel-track::-webkit-scrollbar { display: none; }
+  @media (min-width: 1024px) {
+    .carousel-track {
+      gap: 1.25rem;
+      padding-inline: max(2.5rem, calc(50vw - 720px + 2.5rem));
+      scroll-padding-inline: max(2.5rem, calc(50vw - 720px + 2.5rem));
+    }
+  }
+  .use-card {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    position: relative;
+    border-radius: 1rem;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: #08080b;
+    transition: border-color .4s ease, transform .4s ease;
+    isolation: isolate;
+  }
+  .use-card:hover { border-color: rgba(255,255,255,0.22); }
+  .use-card-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.72;
+    transition: opacity .6s ease, transform .9s ease;
+    z-index: 0;
+  }
+  .use-card:hover .use-card-img { opacity: 0.88; transform: scale(1.045); }
+  .use-card-overlay {
+    position: absolute; inset: 0; z-index: 1;
+    background:
+      linear-gradient(180deg, rgba(5,5,7,0.10) 0%, rgba(5,5,7,0.28) 30%, rgba(5,5,7,0.82) 72%, rgba(5,5,7,0.98) 100%),
+      linear-gradient(180deg, rgba(5,5,7,0) 60%, rgba(5,5,7,0.35) 100%);
+  }
+  .use-card-content { position: relative; z-index: 2; }
+  .carousel-arrow {
+    width: 40px; height: 40px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255,255,255,0.15);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.75);
+    transition: color .25s ease, border-color .25s ease, background .25s ease;
+  }
+  .carousel-arrow:hover { color: white; border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.04); }
+  .carousel-arrow:disabled { opacity: 0.35; cursor: not-allowed; }
+</style>
+</head>
+<body class="bg-ink-950 text-white antialiased overflow-x-hidden">
+
+<!-- ============================== NAV ============================== -->
+<header class="fixed top-0 inset-x-0 z-50 border-b border-white/5 nav-bg">
+  <nav class="relative max-w-[1440px] mx-auto px-6 lg:px-10 h-16 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2.5 group">
+      <span class="relative inline-flex items-center justify-center w-2.5 h-2.5">
+        <span class="absolute inset-0 rounded-full bg-moss-400/80 pulse-dot"></span>
+        <span class="relative w-2.5 h-2.5 rounded-full bg-moss-400"></span>
+      </span>
+      <span class="text-[15px] font-semibold tracking-tight">belto</span>
+      <span class="hidden sm:inline-flex items-center text-[10px] text-white/40 demo-mono uppercase tracking-[0.18em] ml-2 px-1.5 py-0.5 border border-white/10 rounded">v0.1</span>
+    </a>
+    <ul class="hidden md:flex items-center gap-10 text-[14px] text-white/65 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+      <li><a href="#problem" class="hover:text-white transition">Problem</a></li>
+      <li><a href="#solution" class="hover:text-white transition">Solution</a></li>
+      <li><a href="#product" class="hover:text-white transition">Product</a></li>
+      <li><a href="#research" class="hover:text-white transition">Research</a></li>
+    </ul>
+    <div class="flex items-center gap-2">
+      <a href="https://calendly.com/emil-shirokikh-belto/30min" target="_blank" rel="noopener" class="btn-primary !py-2.5 !px-4 !text-[13px]">Discuss Partnership</a>
+    </div>
+  </nav>
+</header>
+
+<!-- ============================== HERO ============================== -->
+<section class="relative min-h-[100svh] hero-bg overflow-hidden">
+  <!-- subtle grid -->
+  <div class="absolute inset-0 grid-overlay opacity-50"></div>
+
+  <!-- starfield -->
+  <svg class="absolute inset-0 w-full h-full opacity-90 pointer-events-none" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1600 900" aria-hidden="true">
+    <g fill="white">
+      <circle cx="80" cy="120" r=".7" opacity=".7" class="twinkle"/>
+      <circle cx="220" cy="60" r=".5" opacity=".5"/>
+      <circle cx="380" cy="180" r=".6" opacity=".4" class="twinkle"/>
+      <circle cx="540" cy="90" r=".4" opacity=".55"/>
+      <circle cx="700" cy="220" r=".7" opacity=".6"/>
+      <circle cx="870" cy="60" r=".5" opacity=".5" class="twinkle"/>
+      <circle cx="1010" cy="160" r=".6" opacity=".4"/>
+      <circle cx="1180" cy="100" r=".5" opacity=".7"/>
+      <circle cx="1330" cy="220" r=".7" opacity=".5"/>
+      <circle cx="1480" cy="80" r=".5" opacity=".6" class="twinkle"/>
+      <circle cx="120" cy="320" r=".4" opacity=".5"/>
+      <circle cx="320" cy="430" r=".5" opacity=".4" class="twinkle"/>
+      <circle cx="510" cy="360" r=".6" opacity=".55"/>
+      <circle cx="720" cy="460" r=".4" opacity=".45"/>
+      <circle cx="940" cy="380" r=".7" opacity=".6" class="twinkle"/>
+      <circle cx="1120" cy="330" r=".5" opacity=".5"/>
+      <circle cx="1290" cy="430" r=".4" opacity=".4"/>
+      <circle cx="1460" cy="370" r=".6" opacity=".5"/>
+      <circle cx="60" cy="540" r=".5" opacity=".4" class="twinkle"/>
+      <circle cx="260" cy="620" r=".7" opacity=".55"/>
+      <circle cx="430" cy="540" r=".4" opacity=".5"/>
+      <circle cx="600" cy="640" r=".6" opacity=".45" class="twinkle"/>
+      <circle cx="820" cy="540" r=".5" opacity=".4"/>
+      <circle cx="990" cy="620" r=".7" opacity=".6"/>
+      <circle cx="1160" cy="560" r=".4" opacity=".5"/>
+      <circle cx="1350" cy="630" r=".6" opacity=".55" class="twinkle"/>
+      <circle cx="1510" cy="540" r=".5" opacity=".4"/>
+    </g>
+  </svg>
+
+  <!-- Earth horizon. Phone/tablet: a small bottom-anchored crescent.
+       Laptop+: image scales up ~3x and most of the planet sits below the viewport,
+       so only the upper curve shows just below the subheadline. -->
+  <div class="hero-earth-wrap absolute left-1/2 -translate-x-1/2 pointer-events-none">
+    <img src="assets/earth.png" alt="" class="hero-earth-img block w-full h-full object-cover" />
+  </div>
+
+  <!-- Floating satellite (hidden) -->
+  <!--
+  <div class="absolute top-[8%] right-[2%] lg:right-[4%] floaty pointer-events-none">
+    <div class="relative w-[320px] sm:w-[400px] lg:w-[480px] opacity-95">
+      <img src="assets/satellite.png" alt="" draggable="false" class="w-full h-auto select-none" />
+      <div class="absolute top-[10%] right-[4%] demo-mono text-[10px] text-white/55 tracking-[.1em] text-right flex items-center gap-2 justify-end">
+        SAT-04 // belto-os
+        <span class="w-8 h-px bg-white/25"></span>
+      </div>
+      <div class="absolute bottom-[14%] right-[4%] demo-mono text-[10px] text-white/40 tracking-[.1em] text-right flex items-center gap-2 justify-end">
+        ALT 423 km · INC 51.6°
+        <span class="w-8 h-px bg-white/25"></span>
+      </div>
+    </div>
+  </div>
+  -->
+
+  <!-- coordinate tick marks at edges -->
+  <div class="absolute inset-y-0 left-4 hidden lg:flex flex-col justify-between py-28 demo-mono text-[10px] text-white/25 tracking-widest pointer-events-none">
+    <span>N 51.6°</span><span>+ 000</span><span>S 51.6°</span>
+  </div>
+  <div class="absolute inset-x-0 top-20 hidden lg:flex justify-between px-10 demo-mono text-[10px] text-white/25 tracking-widest pointer-events-none">
+    <span>W 122°</span><span>00:00 UTC</span><span>E 122°</span>
+  </div>
+
+  <!-- Hero content -->
+  <div class="relative z-10 max-w-[1440px] mx-auto px-6 lg:px-10 pt-40 pb-28 lg:pt-56 lg:pb-40">
+    <p class="eyebrow mb-7">Orbital Edge AI Runtime</p>
+    <h1 class="text-[44px] sm:text-6xl lg:text-[96px] xl:text-[112px] font-medium tracking-tightest leading-[0.95] max-w-5xl">
+      Deploy AI to the<br class="hidden sm:block"/> edge of space.
+    </h1>
+    <p class="mt-8 text-base lg:text-xl text-white/60 max-w-2xl leading-relaxed">
+      belto runs mission AI onboard satellites and constrained edge systems, turning raw sensor streams into compact, downlink-ready insight.
+    </p>
+    <div class="mt-10 flex flex-wrap items-center gap-3">
+      <a href="https://space-conquering-hackathon.vercel.app" target="_blank" rel="noopener" class="btn-primary">
+        Try Demo
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a href="https://calendly.com/emil-shirokikh-belto/30min" target="_blank" rel="noopener" class="btn-secondary">Discuss Partnership</a>
+    </div>
+  </div>
+
+  <!-- bottom indicator -->
+  <div class="absolute bottom-7 right-6 lg:right-10 flex items-center gap-3 demo-mono text-[10px] text-white/40 tracking-[0.22em] uppercase">
+    Scroll
+    <svg width="14" height="22" viewBox="0 0 14 22" fill="none" aria-hidden="true">
+      <rect x="0.5" y="0.5" width="13" height="21" rx="6.5" stroke="currentColor" stroke-opacity=".5"/>
+      <circle cx="7" cy="7" r="1.5" fill="currentColor"/>
+    </svg>
+  </div>
+</section>
+
+<!-- ============================== PROBLEM ============================== -->
+<section id="problem" class="relative py-24 lg:py-32 border-t border-white/[0.06]">
+  <div class="max-w-[1440px] mx-auto px-6 lg:px-10">
+    <div class="grid lg:grid-cols-12 gap-10 lg:gap-16 items-end mb-16 lg:mb-24 reveal">
+      <div class="lg:col-span-7">
+        <p class="eyebrow mb-6">Problem</p>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-xtight leading-[1.02]">
+          Spacecraft collect more<br/>data than they can send.
+        </h2>
+      </div>
+      <p class="lg:col-span-4 lg:col-start-9 text-white/55 text-base lg:text-lg leading-relaxed">
+        Orbital systems operate under hard limits: narrow downlink windows, restricted power, limited memory, and mission-critical timing.
+      </p>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-4 lg:gap-5 reveal">
+      <!-- card 01 -->
+      <article class="card relative">
+        <div class="flex items-start justify-between mb-10">
+          <span class="demo-mono text-[12px] text-white/40 tracking-[0.18em]">01</span>
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" class="text-white/30">
+            <rect x="3" y="3" width="16" height="16" rx="1" stroke="currentColor" stroke-width="1"/>
+            <path d="M3 11h16M11 3v16" stroke="currentColor" stroke-width=".6" stroke-dasharray="1.5 2"/>
+          </svg>
+        </div>
+        <h3 class="text-xl lg:text-2xl font-medium tracking-tight mb-3">Raw data overload</h3>
+        <p class="text-white/55 leading-relaxed">Earth observation, telemetry, and onboard sensors can generate more data than operators can transmit in time.</p>
+      </article>
+      <!-- card 02 -->
+      <article class="card relative">
+        <div class="flex items-start justify-between mb-10">
+          <span class="demo-mono text-[12px] text-white/40 tracking-[0.18em]">02</span>
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" class="text-white/30">
+            <path d="M3 19c4-9 12-9 16 0" stroke="currentColor" stroke-width="1"/>
+            <circle cx="11" cy="6" r="1.6" fill="currentColor"/>
+            <path d="M11 6v6" stroke="currentColor" stroke-width=".6" stroke-dasharray="1.5 2"/>
+          </svg>
+        </div>
+        <h3 class="text-xl lg:text-2xl font-medium tracking-tight mb-3">Limited downlink</h3>
+        <p class="text-white/55 leading-relaxed">Connectivity windows are brief, intermittent, and expensive. Every byte must justify the trip to the ground.</p>
+      </article>
+      <!-- card 03 -->
+      <article class="card relative">
+        <div class="flex items-start justify-between mb-10">
+          <span class="demo-mono text-[12px] text-white/40 tracking-[0.18em]">03</span>
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" class="text-white/30">
+            <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1"/>
+            <path d="M11 6v5l3 2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h3 class="text-xl lg:text-2xl font-medium tracking-tight mb-3">Delayed insight</h3>
+        <p class="text-white/55 leading-relaxed">Cloud-first workflows wait for data to land before teams can detect, prioritize, or act.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== SOLUTION ============================== -->
+<section id="solution" class="relative py-24 lg:py-36 overflow-hidden">
+  <div class="absolute inset-0 grid-overlay opacity-30 pointer-events-none"></div>
+  <div class="max-w-[1440px] mx-auto px-6 lg:px-10 relative">
+
+    <div class="grid lg:grid-cols-12 gap-10 lg:gap-16 items-end mb-16 lg:mb-20 reveal">
+      <div class="lg:col-span-7">
+        <p class="eyebrow mb-6">Solution</p>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-xtight leading-[1.02]">
+          Process onboard.<br/>Send what matters.
+        </h2>
+      </div>
+      <p class="lg:col-span-4 lg:col-start-9 text-white/55 text-base lg:text-lg leading-relaxed">
+        belto packages models, rules, and mission constraints into deployable jobs that run close to the sensor.
+      </p>
+    </div>
+
+    <!-- Layered orbital schematic -->
+    <div class="relative mb-20 lg:mb-28 reveal">
+      <div class="relative aspect-[16/8] w-full max-w-5xl mx-auto">
+        <!-- back layer -->
+        <div class="absolute inset-0 rounded-2xl border border-white/10 -translate-x-6 translate-y-6 opacity-40"></div>
+        <div class="absolute inset-0 rounded-2xl border border-white/10 -translate-x-3 translate-y-3 opacity-60"></div>
+        <!-- main frame -->
+        <div class="absolute inset-0 rounded-2xl border border-white/15 bg-ink-900/60 overflow-hidden">
+          <!-- schematic SVG: satellite over earth view with sensor cones and annotations -->
+          <svg viewBox="0 0 1000 500" class="w-full h-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <defs>
+              <linearGradient id="oceanG" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#0d2138"/>
+                <stop offset="100%" stop-color="#08172a"/>
+              </linearGradient>
+              <radialGradient id="atmoG" cx="50%" cy="100%" r="80%">
+                <stop offset="0%" stop-color="rgba(120,170,230,.5)"/>
+                <stop offset="60%" stop-color="rgba(50,90,150,.15)"/>
+                <stop offset="100%" stop-color="transparent"/>
+              </radialGradient>
+            </defs>
+            <!-- earth curve -->
+            <path d="M -50 500 Q 500 280 1050 500 Z" fill="url(#oceanG)"/>
+            <ellipse cx="500" cy="500" rx="700" ry="220" fill="url(#atmoG)" opacity=".8"/>
+            <!-- coastline contour -->
+            <path d="M 80 470 Q 200 430 280 460 T 460 440 T 640 470 T 820 450 T 980 470" stroke="rgba(255,255,255,.18)" stroke-width=".8" fill="none"/>
+            <path d="M 120 490 Q 240 470 360 482 T 600 478 T 880 488" stroke="rgba(255,255,255,.08)" stroke-width=".6" fill="none"/>
+            <!-- target ROIs -->
+            <g stroke="rgba(74,222,128,.8)" stroke-width=".8" fill="none">
+              <rect x="380" y="430" width="22" height="14"/>
+              <rect x="566" y="448" width="18" height="12"/>
+              <rect x="724" y="436" width="16" height="14"/>
+            </g>
+            <g fill="rgba(74,222,128,.9)" font-family="mono, mono Fallback, ui-monospace, monospace" font-size="8" letter-spacing=".1em">
+              <text x="408" y="438">VESSEL</text>
+              <text x="588" y="456">FIRE</text>
+              <text x="744" y="444">VESSEL</text>
+            </g>
+            <!-- satellite image -->
+            <image href="assets/satellite.png" x="400" y="20" width="280" height="160" preserveAspectRatio="xMidYMid meet"/>
+            <!-- sensor cones -->
+            <g stroke="rgba(140,180,240,.32)" stroke-width=".6" fill="rgba(140,180,240,.04)">
+              <path d="M 540 130 L 380 440 L 600 460 Z"/>
+            </g>
+            <!-- annotations -->
+            <g fill="rgba(255,255,255,.55)" font-family="mono, mono Fallback, ui-monospace, monospace" font-size="9" letter-spacing=".12em">
+              <text x="700" y="80">SAT-04 / belto-os</text>
+              <text x="700" y="96" fill="rgba(255,255,255,.35)">ALT 423 km</text>
+              <text x="700" y="110" fill="rgba(255,255,255,.35)">INC 51.6°</text>
+              <line x1="640" y1="92" x2="690" y2="92" stroke="rgba(255,255,255,.25)" stroke-width=".5"/>
+            </g>
+            <!-- downlink line -->
+            <g>
+              <line x1="540" y1="130" x2="900" y2="470" stroke="rgba(74,222,128,.4)" stroke-width=".6" stroke-dasharray="2 3"/>
+              <text x="780" y="320" font-family="mono, mono Fallback, ui-monospace, monospace" font-size="9" fill="rgba(74,222,128,.7)" letter-spacing=".12em">DOWNLINK</text>
+            </g>
+            <!-- crosshairs -->
+            <g stroke="rgba(255,255,255,.18)" stroke-width=".5">
+              <line x1="0" y1="250" x2="1000" y2="250" stroke-dasharray="3 6"/>
+              <line x1="500" y1="0" x2="500" y2="500" stroke-dasharray="3 6"/>
+            </g>
+          </svg>
+          <!-- corner brackets -->
+          <span class="absolute top-3 left-3 w-3 h-3 bracket-tl"></span>
+          <span class="absolute top-3 right-3 w-3 h-3 bracket-tr"></span>
+          <span class="absolute bottom-3 left-3 w-3 h-3 bracket-bl"></span>
+          <span class="absolute bottom-3 right-3 w-3 h-3 bracket-br"></span>
+          <!-- corner labels -->
+          <div class="absolute top-3 left-8 demo-mono text-[10px] text-white/40 tracking-[.18em]">OBS · LIVE</div>
+          <div class="absolute bottom-3 right-8 demo-mono text-[10px] text-white/40 tracking-[.18em]">FRAME 0021</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- three pillars -->
+    <div class="grid md:grid-cols-3 gap-px bg-white/[0.07] rounded-xl overflow-hidden border border-white/[0.07] reveal">
+      <div class="bg-ink-950 p-8 lg:p-10">
+        <div class="flex items-center gap-2 mb-6">
+          <span class="w-1.5 h-1.5 rounded-full bg-moss-400"></span>
+          <span class="demo-mono text-[11px] tracking-[.18em] text-white/65">ONBOARD</span>
+        </div>
+        <p class="text-lg lg:text-xl text-white leading-snug max-w-xs">Run inference before raw data leaves the spacecraft or remote system.</p>
+      </div>
+      <div class="bg-ink-950 p-8 lg:p-10">
+        <div class="flex items-center gap-2 mb-6">
+          <span class="w-1.5 h-1.5 rounded-full bg-moss-400"></span>
+          <span class="demo-mono text-[11px] tracking-[.18em] text-white/65">COMPACT</span>
+        </div>
+        <p class="text-lg lg:text-xl text-white leading-snug max-w-xs">Transmit alerts, detections, summaries, and prioritized outputs instead of unnecessary raw volume.</p>
+      </div>
+      <div class="bg-ink-950 p-8 lg:p-10">
+        <div class="flex items-center gap-2 mb-6">
+          <span class="w-1.5 h-1.5 rounded-full bg-moss-400"></span>
+          <span class="demo-mono text-[11px] tracking-[.18em] text-white/65">BOUNDED</span>
+        </div>
+        <p class="text-lg lg:text-xl text-white leading-snug max-w-xs">Define every job around bandwidth, latency, power, memory, and operating context.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== WORKFLOW ============================== -->
+<section class="relative py-24 lg:py-32 border-t border-white/[0.06]">
+  <div class="max-w-[1440px] mx-auto px-6 lg:px-10">
+    <div class="grid lg:grid-cols-12 gap-10 lg:gap-16 items-end mb-16 lg:mb-20 reveal">
+      <div class="lg:col-span-7">
+        <p class="eyebrow mb-6">Workflow</p>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-xtight leading-[1.02]">
+          From model to<br/>mission insight.
+        </h2>
+      </div>
+    </div>
+
+    <div class="relative reveal">
+      <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-4 lg:gap-5">
+        <div class="card relative">
+          <div class="absolute -top-3 left-8 px-2 py-0.5 bg-ink-950 demo-mono text-[11px] text-white/40 tracking-[.18em]">STEP</div>
+          <div class="flex items-baseline gap-3 mb-10">
+            <span class="text-3xl font-medium">01</span>
+            <span class="demo-mono text-[11px] text-white/40 tracking-[.18em]">PACKAGE</span>
+          </div>
+          <h3 class="text-lg lg:text-xl font-medium mb-3">Package</h3>
+          <p class="text-white/55 leading-relaxed text-sm lg:text-base">Bundle models, preprocessing rules, thresholds, and mission limits.</p>
+        </div>
+        <div class="card relative">
+          <div class="absolute -top-3 left-8 px-2 py-0.5 bg-ink-950 demo-mono text-[11px] text-white/40 tracking-[.18em]">STEP</div>
+          <div class="flex items-baseline gap-3 mb-10">
+            <span class="text-3xl font-medium">02</span>
+            <span class="demo-mono text-[11px] text-white/40 tracking-[.18em]">SIMULATE</span>
+          </div>
+          <h3 class="text-lg lg:text-xl font-medium mb-3">Simulate</h3>
+          <p class="text-white/55 leading-relaxed text-sm lg:text-base">Test behavior against compute, memory, latency, and bandwidth constraints.</p>
+        </div>
+        <div class="card relative">
+          <div class="absolute -top-3 left-8 px-2 py-0.5 bg-ink-950 demo-mono text-[11px] text-white/40 tracking-[.18em]">STEP</div>
+          <div class="flex items-baseline gap-3 mb-10">
+            <span class="text-3xl font-medium">03</span>
+            <span class="demo-mono text-[11px] text-white/40 tracking-[.18em]">RUN</span>
+          </div>
+          <h3 class="text-lg lg:text-xl font-medium mb-3">Run</h3>
+          <p class="text-white/55 leading-relaxed text-sm lg:text-base">Execute inference and logic near the source of the data.</p>
+        </div>
+        <div class="card relative">
+          <div class="absolute -top-3 left-8 px-2 py-0.5 bg-ink-950 demo-mono text-[11px] text-white/40 tracking-[.18em]">STEP</div>
+          <div class="flex items-baseline gap-3 mb-10">
+            <span class="text-3xl font-medium">04</span>
+            <span class="demo-mono text-[11px] text-white/40 tracking-[.18em]">DOWNLINK</span>
+          </div>
+          <h3 class="text-lg lg:text-xl font-medium mb-3">Downlink</h3>
+          <p class="text-white/55 leading-relaxed text-sm lg:text-base">Send structured insight, alerts, and summaries during narrow transmission windows.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== USE CASES ============================== -->
+<section class="relative py-24 lg:py-32 border-t border-white/[0.06] overflow-hidden">
+  <div class="max-w-[1440px] mx-auto px-6 lg:px-10">
+    <div class="grid lg:grid-cols-12 gap-10 lg:gap-16 items-end mb-16 lg:mb-20 reveal">
+      <div class="lg:col-span-7">
+        <p class="eyebrow mb-6">Use Cases</p>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-xtight leading-[1.02]">
+          AI workflows for<br/>constrained environments.
+        </h2>
+      </div>
+      <p class="lg:col-span-4 lg:col-start-9 text-white/55 text-base lg:text-lg leading-relaxed">
+        Built for missions where insight is more valuable than raw volume.
+      </p>
+    </div>
+  </div>
+
+  <!-- Carousel (full bleed on the right edge) -->
+  <div class="reveal">
+    <div id="useCarousel" class="carousel-track">
+
+      <article class="use-card w-[280px] sm:w-[320px] lg:w-[380px] aspect-[3/4]">
+        <img class="use-card-img" src="assets/eo-filtering.png" alt="" loading="lazy" />
+        <div class="absolute inset-0 z-[1] pointer-events-none" style="background: linear-gradient(180deg, rgba(5,5,7,0) 0%, rgba(5,5,7,0) 64%, rgba(5,5,7,0.55) 76%, rgba(5,5,7,0.96) 92%, rgba(5,5,7,1) 100%);"></div>
+        <div class="use-card-content absolute top-5 left-5 demo-mono text-[10px] text-white/65 tracking-[.18em]">01 · OBS</div>
+        <div class="use-card-content absolute top-5 right-5 demo-mono text-[10px] text-white/45 tracking-[.18em]">EO</div>
+        <div class="use-card-content absolute bottom-0 left-0 right-0 p-6 lg:p-7">
+          <h3 class="text-xl lg:text-2xl font-medium tracking-tight mb-2.5">Earth observation filtering</h3>
+          <p class="text-white/60 text-sm leading-relaxed">Identify useful frames before downlinking full sensor captures.</p>
+        </div>
+      </article>
+
+      <article class="use-card w-[280px] sm:w-[320px] lg:w-[380px] aspect-[3/4]">
+        <img class="use-card-img" src="assets/wildfire-detection.png" alt="" loading="lazy" />
+        <div class="absolute inset-0 z-[1] pointer-events-none" style="background: linear-gradient(180deg, rgba(5,5,7,0) 0%, rgba(5,5,7,0) 64%, rgba(5,5,7,0.55) 76%, rgba(5,5,7,0.96) 92%, rgba(5,5,7,1) 100%);"></div>
+        <div class="use-card-content absolute top-5 left-5 demo-mono text-[10px] text-white/65 tracking-[.18em]">02 · IR</div>
+        <div class="use-card-content absolute top-5 right-5 demo-mono text-[10px] text-white/45 tracking-[.18em]">FIRE</div>
+        <div class="use-card-content absolute bottom-0 left-0 right-0 p-6 lg:p-7">
+          <h3 class="text-xl lg:text-2xl font-medium tracking-tight mb-2.5">Wildfire detection</h3>
+          <p class="text-white/60 text-sm leading-relaxed">Flag likely wildfire signatures for faster operational awareness.</p>
+        </div>
+      </article>
+
+      <article class="use-card w-[280px] sm:w-[320px] lg:w-[380px] aspect-[3/4]">
+        <img class="use-card-img" src="assets/vessel-detection.png" alt="" loading="lazy" />
+        <div class="absolute inset-0 z-[1] pointer-events-none" style="background: linear-gradient(180deg, rgba(5,5,7,0) 0%, rgba(5,5,7,0) 64%, rgba(5,5,7,0.55) 76%, rgba(5,5,7,0.96) 92%, rgba(5,5,7,1) 100%);"></div>
+        <div class="use-card-content absolute top-5 left-5 demo-mono text-[10px] text-white/65 tracking-[.18em]">03 · SAR</div>
+        <div class="use-card-content absolute top-5 right-5 demo-mono text-[10px] text-white/45 tracking-[.18em]">MARINE</div>
+        <div class="use-card-content absolute bottom-0 left-0 right-0 p-6 lg:p-7">
+          <h3 class="text-xl lg:text-2xl font-medium tracking-tight mb-2.5">Vessel detection</h3>
+          <p class="text-white/60 text-sm leading-relaxed">Prioritize maritime detections and regions of interest.</p>
+        </div>
+      </article>
+
+      <article class="use-card w-[280px] sm:w-[320px] lg:w-[380px] aspect-[3/4]">
+        <img class="use-card-img" src="assets/telemetry-anomaly.png" alt="" loading="lazy" />
+        <div class="absolute inset-0 z-[1] pointer-events-none" style="background: linear-gradient(180deg, rgba(5,5,7,0) 0%, rgba(5,5,7,0) 64%, rgba(5,5,7,0.55) 76%, rgba(5,5,7,0.96) 92%, rgba(5,5,7,1) 100%);"></div>
+        <div class="use-card-content absolute top-5 left-5 demo-mono text-[10px] text-white/65 tracking-[.18em]">04 · TLM</div>
+        <div class="use-card-content absolute top-5 right-5 demo-mono text-[10px] text-white/45 tracking-[.18em]">SIGNAL</div>
+        <div class="use-card-content absolute bottom-0 left-0 right-0 p-6 lg:p-7">
+          <h3 class="text-xl lg:text-2xl font-medium tracking-tight mb-2.5">Telemetry anomaly detection</h3>
+          <p class="text-white/60 text-sm leading-relaxed">Surface unusual signals from onboard telemetry streams.</p>
+        </div>
+      </article>
+
+      <article class="use-card w-[280px] sm:w-[320px] lg:w-[380px] aspect-[3/4]">
+        <img class="use-card-img" src="assets/predictive-threat.png" alt="" loading="lazy" />
+        <div class="absolute inset-0 z-[1] pointer-events-none" style="background: linear-gradient(180deg, rgba(5,5,7,0) 0%, rgba(5,5,7,0) 64%, rgba(5,5,7,0.55) 76%, rgba(5,5,7,0.96) 92%, rgba(5,5,7,1) 100%);"></div>
+        <div class="use-card-content absolute top-5 left-5 demo-mono text-[10px] text-white/65 tracking-[.18em]">05 · ALR</div>
+        <div class="use-card-content absolute top-5 right-5 demo-mono text-[10px] text-white/45 tracking-[.18em]">RISK</div>
+        <div class="use-card-content absolute bottom-0 left-0 right-0 p-6 lg:p-7">
+          <h3 class="text-xl lg:text-2xl font-medium tracking-tight mb-2.5">Predictive threat alerts</h3>
+          <p class="text-white/60 text-sm leading-relaxed">Detect patterns that may indicate operational risk.</p>
+        </div>
+      </article>
+
+      <article class="use-card w-[280px] sm:w-[320px] lg:w-[380px] aspect-[3/4]">
+        <img class="use-card-img" src="assets/downlink-prioritization.png" alt="" loading="lazy" />
+        <div class="absolute inset-0 z-[1] pointer-events-none" style="background: linear-gradient(180deg, rgba(5,5,7,0) 0%, rgba(5,5,7,0) 64%, rgba(5,5,7,0.55) 76%, rgba(5,5,7,0.96) 92%, rgba(5,5,7,1) 100%);"></div>
+        <div class="use-card-content absolute top-5 left-5 demo-mono text-[10px] text-white/65 tracking-[.18em]">06 · DWL</div>
+        <div class="use-card-content absolute top-5 right-5 demo-mono text-[10px] text-white/45 tracking-[.18em]">LINK</div>
+        <div class="use-card-content absolute bottom-0 left-0 right-0 p-6 lg:p-7">
+          <h3 class="text-xl lg:text-2xl font-medium tracking-tight mb-2.5">Autonomous downlink prioritization</h3>
+          <p class="text-white/60 text-sm leading-relaxed">Choose what should transmit first when connection windows are limited.</p>
+        </div>
+      </article>
+
+      <article class="use-card w-[280px] sm:w-[320px] lg:w-[380px] aspect-[3/4]">
+        <img class="use-card-img" src="assets/degraded-comms.png" alt="" loading="lazy" />
+        <div class="absolute inset-0 z-[1] pointer-events-none" style="background: linear-gradient(180deg, rgba(5,5,7,0) 0%, rgba(5,5,7,0) 64%, rgba(5,5,7,0.55) 76%, rgba(5,5,7,0.96) 92%, rgba(5,5,7,1) 100%);"></div>
+        <div class="use-card-content absolute top-5 left-5 demo-mono text-[10px] text-white/65 tracking-[.18em]">07 · COM</div>
+        <div class="use-card-content absolute top-5 right-5 demo-mono text-[10px] text-white/45 tracking-[.18em]">DEG</div>
+        <div class="use-card-content absolute bottom-0 left-0 right-0 p-6 lg:p-7">
+          <h3 class="text-xl lg:text-2xl font-medium tracking-tight mb-2.5">Degraded communications</h3>
+          <p class="text-white/60 text-sm leading-relaxed">Keep AI workflows useful when links are intermittent or constrained.</p>
+        </div>
+      </article>
+
+      <!-- trailing CTA card -->
+      <article class="use-card w-[280px] sm:w-[320px] lg:w-[380px] aspect-[3/4] !bg-moss-700 !border-moss-600">
+        <div class="absolute inset-0 grid-overlay opacity-30"></div>
+        <div class="use-card-content absolute top-5 left-5 demo-mono text-[10px] text-white/65 tracking-[.18em]">08 · TALK</div>
+        <div class="use-card-content absolute inset-0 p-6 lg:p-7 flex flex-col justify-end">
+          <h3 class="text-xl lg:text-2xl font-medium tracking-tight mb-2.5">Discuss your mission</h3>
+          <p class="text-white/70 text-sm leading-relaxed mb-6">Tell us about the constraints. We'll show you what onboard inference looks like for your stack.</p>
+          <a href="https://calendly.com/emil-shirokikh-belto/30min" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-white text-sm font-medium">
+            Discuss Partnership
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
+      </article>
+
+    </div>
+
+    <!-- progress + arrows -->
+    <div class="max-w-[1440px] mx-auto px-6 lg:px-10 mt-10 flex items-center gap-6 lg:gap-10">
+      <div class="hidden sm:block demo-mono text-[11px] text-white/40 tracking-[.18em]">
+        <span id="carouselIndex">01</span><span class="text-white/25"> / 08</span>
+      </div>
+      <div class="flex-1 h-px bg-white/[0.08] relative overflow-hidden">
+        <div id="carouselProgress" class="absolute inset-y-0 left-0 bg-white/45 transition-[width] duration-300" style="width: 14%;"></div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="carouselPrev" class="carousel-arrow" aria-label="Previous use case">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 3l-4 4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button id="carouselNext" class="carousel-arrow" aria-label="Next use case">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== PRODUCT ============================== -->
+<section id="product" class="relative py-24 lg:py-32 border-t border-white/[0.06] overflow-hidden">
+  <div class="absolute inset-0 grid-overlay opacity-25 pointer-events-none"></div>
+  <div class="max-w-[1440px] mx-auto px-6 lg:px-10 relative">
+    <div class="grid lg:grid-cols-12 gap-10 lg:gap-16 items-end mb-16 lg:mb-20 reveal">
+      <div class="lg:col-span-7">
+        <p class="eyebrow mb-6">Product</p>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-xtight leading-[1.02]">
+          An SDK and runtime for<br/>mission-constrained AI.
+        </h2>
+      </div>
+      <p class="lg:col-span-4 lg:col-start-9 text-white/55 text-base lg:text-lg leading-relaxed">
+        belto turns AI models, rules, and operating limits into deployable mission packages optimized for constrained edge hardware.
+      </p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 reveal">
+      <!-- product 1 -->
+      <article class="card flex flex-col">
+        <!-- mock illustration -->
+        <div class="relative h-44 mb-8 -mx-4 lg:-mx-6 -mt-4 lg:-mt-6 rounded-t-xl overflow-hidden bg-ink-900/60 border-b border-white/[0.06]">
+          <svg viewBox="0 0 400 200" class="w-full h-full">
+            <defs><pattern id="grid1" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,.04)" stroke-width=".5"/></pattern></defs>
+            <rect width="400" height="200" fill="url(#grid1)"/>
+            <!-- package representation -->
+            <g transform="translate(40 40)">
+              <rect x="0" y="0" width="120" height="32" rx="3" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.2)"/>
+              <rect x="6" y="8" width="14" height="16" fill="#4ade80" opacity=".7"/>
+              <text x="28" y="20" font-family="mono, mono Fallback, ui-monospace, monospace" font-size="9" fill="rgba(255,255,255,.7)" letter-spacing=".1em">model.onnx</text>
+              <rect x="0" y="42" width="120" height="32" rx="3" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.2)"/>
+              <rect x="6" y="50" width="14" height="16" fill="rgba(140,180,240,.55)"/>
+              <text x="28" y="62" font-family="mono, mono Fallback, ui-monospace, monospace" font-size="9" fill="rgba(255,255,255,.7)" letter-spacing=".1em">rules.yml</text>
+              <rect x="0" y="84" width="120" height="32" rx="3" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.2)"/>
+              <rect x="6" y="92" width="14" height="16" fill="rgba(180,140,240,.55)"/>
+              <text x="28" y="104" font-family="mono, mono Fallback, ui-monospace, monospace" font-size="9" fill="rgba(255,255,255,.7)" letter-spacing=".1em">limits.toml</text>
+            </g>
+            <!-- arrow -->
+            <g stroke="rgba(255,255,255,.3)" stroke-width=".8" fill="none">
+              <path d="M 180 96 L 240 96" stroke-dasharray="3 3"/>
+              <path d="M 232 92 L 240 96 L 232 100"/>
+            </g>
+            <!-- bundle -->
+            <g transform="translate(260 60)">
+              <rect x="0" y="0" width="100" height="80" rx="4" fill="rgba(74,222,128,.05)" stroke="rgba(74,222,128,.55)"/>
+              <text x="14" y="44" font-family="mono, mono Fallback, ui-monospace, monospace" font-size="11" fill="rgba(74,222,128,.9)" letter-spacing=".14em">PACKAGE</text>
+              <text x="14" y="58" font-family="mono, mono Fallback, ui-monospace, monospace" font-size="8" fill="rgba(255,255,255,.5)" letter-spacing=".14em">v0.4.1 · 12.4 MB</text>
+            </g>
+          </svg>
+          <span class="absolute top-3 left-3 demo-mono text-[10px] text-white/40 tracking-[.18em]">SDK</span>
+        </div>
+        <h3 class="text-xl font-medium mb-3 px-0">Mission package builder</h3>
+        <p class="text-white/55 leading-relaxed">Bundle models, preprocessing, thresholds, metadata, and mission limits into one deployable package.</p>
+      </article>
+
+      <!-- product 2 -->
+      <article class="card flex flex-col">
+        <div class="relative h-44 mb-8 -mx-4 lg:-mx-6 -mt-4 lg:-mt-6 rounded-t-xl overflow-hidden bg-ink-900/60 border-b border-white/[0.06]">
+          <svg viewBox="0 0 400 200" class="w-full h-full">
+            <rect width="400" height="200" fill="url(#grid1)"/>
+            <!-- bar gauges -->
+            <g font-family="mono, mono Fallback, ui-monospace, monospace" font-size="8" letter-spacing=".12em" fill="rgba(255,255,255,.55)">
+              <text x="40" y="42">COMPUTE</text>
+              <rect x="120" y="34" width="220" height="6" rx="1" fill="rgba(255,255,255,.06)"/>
+              <rect x="120" y="34" width="148" height="6" rx="1" fill="rgba(74,222,128,.8)"/>
+              <text x="346" y="42" fill="rgba(255,255,255,.4)">67%</text>
+
+              <text x="40" y="82">MEMORY</text>
+              <rect x="120" y="74" width="220" height="6" rx="1" fill="rgba(255,255,255,.06)"/>
+              <rect x="120" y="74" width="92" height="6" rx="1" fill="rgba(140,180,240,.85)"/>
+              <text x="346" y="82" fill="rgba(255,255,255,.4)">42%</text>
+
+              <text x="40" y="122">LATENCY</text>
+              <rect x="120" y="114" width="220" height="6" rx="1" fill="rgba(255,255,255,.06)"/>
+              <rect x="120" y="114" width="44" height="6" rx="1" fill="rgba(255,210,120,.85)"/>
+              <text x="346" y="122" fill="rgba(255,255,255,.4)">20%</text>
+
+              <text x="40" y="162">DOWNLINK</text>
+              <rect x="120" y="154" width="220" height="6" rx="1" fill="rgba(255,255,255,.06)"/>
+              <rect x="120" y="154" width="186" height="6" rx="1" fill="rgba(180,140,240,.85)"/>
+              <text x="346" y="162" fill="rgba(255,255,255,.4)">85%</text>
+            </g>
+          </svg>
+          <span class="absolute top-3 left-3 demo-mono text-[10px] text-white/40 tracking-[.18em]">SIMULATOR</span>
+        </div>
+        <h3 class="text-xl font-medium mb-3">Runtime simulator</h3>
+        <p class="text-white/55 leading-relaxed">Preview how a package behaves under compute, memory, latency, and bandwidth constraints.</p>
+      </article>
+
+      <!-- product 3 -->
+      <article class="card flex flex-col">
+        <div class="relative h-44 mb-8 -mx-4 lg:-mx-6 -mt-4 lg:-mt-6 rounded-t-xl overflow-hidden bg-ink-900/60 border-b border-white/[0.06]">
+          <svg viewBox="0 0 400 200" class="w-full h-full">
+            <rect width="400" height="200" fill="url(#grid1)"/>
+            <g font-family="mono, mono Fallback, ui-monospace, monospace" font-size="9" letter-spacing=".1em" fill="rgba(255,255,255,.65)">
+              <text x="20" y="32">14:23:08 <tspan fill="rgba(74,222,128,.9)">INFER</tspan> vessel.detect conf 0.94</text>
+              <text x="20" y="54">14:22:51 <tspan fill="rgba(74,222,128,.9)">INFER</tspan> wildfire.signature 0.91</text>
+              <text x="20" y="76">14:22:17 <tspan fill="rgba(140,180,240,.9)">COMPRESS</tspan> frame 0021 → 6.2 KB</text>
+              <text x="20" y="98">14:21:55 <tspan fill="rgba(180,140,240,.9)">QUEUE</tspan> downlink P1</text>
+              <text x="20" y="120">14:21:42 <tspan fill="rgba(255,210,120,.9)">ANOMALY</tspan> telemetry-bus-3</text>
+              <text x="20" y="142">14:21:08 <tspan fill="rgba(74,222,128,.9)">INFER</tspan> vessel.detect conf 0.88</text>
+              <text x="20" y="164">14:20:42 <tspan fill="rgba(140,180,240,.9)">COMPRESS</tspan> frame 0020 → 4.8 KB</text>
+              <text x="20" y="186">14:20:11 <tspan fill="rgba(255,255,255,.4)">SLEEP</tspan> awaiting window</text>
+            </g>
+          </svg>
+          <span class="absolute top-3 left-3 demo-mono text-[10px] text-white/40 tracking-[.18em]">LOGS</span>
+        </div>
+        <h3 class="text-xl font-medium mb-3">Mission logs</h3>
+        <p class="text-white/55 leading-relaxed">Inspect what ran, what was detected, what was compressed, and what would be transmitted.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== DEMO ============================== -->
+<section class="relative py-24 lg:py-32 border-t border-white/[0.06] overflow-hidden">
+  <div class="max-w-[1440px] mx-auto px-6 lg:px-10">
+    <div class="grid lg:grid-cols-12 gap-10 lg:gap-16 items-end mb-12 lg:mb-16 reveal">
+      <div class="lg:col-span-7">
+        <p class="eyebrow mb-6">Demo</p>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-xtight leading-[1.02]">
+          Try a simulated<br/>mission package.
+        </h2>
+      </div>
+      <p class="lg:col-span-4 lg:col-start-9 text-white/55 text-base lg:text-lg leading-relaxed">
+        Deploy an AI package to a simulated satellite, inspect mission logs, and see how raw data becomes downlink-ready insight.
+      </p>
+    </div>
+
+    <!-- Mission control dashboard mockup -->
+    <div class="relative reveal">
+      <div class="absolute -inset-px rounded-2xl bg-gradient-to-br from-white/10 via-white/[0.02] to-transparent pointer-events-none"></div>
+      <div class="relative bg-ink-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+
+        <img src="assets/demo-dashboard.png" alt="belto mission console" class="block w-full h-auto select-none" draggable="false" />
+
+      </div>
+    </div>
+
+    <!-- CTAs below demo -->
+    <div class="mt-10 flex flex-wrap items-center gap-3 reveal">
+      <a href="https://space-conquering-hackathon.vercel.app" target="_blank" rel="noopener" class="btn-primary">
+        Try Demo
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a href="https://calendly.com/emil-shirokikh-belto/30min" target="_blank" rel="noopener" class="btn-secondary">Discuss Partnership</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== RESEARCH ============================== -->
+<section id="research" class="relative py-24 lg:py-32 border-t border-white/[0.06]">
+  <div class="max-w-[1440px] mx-auto px-6 lg:px-10">
+    <div class="grid lg:grid-cols-12 gap-10 lg:gap-16 reveal">
+      <div class="lg:col-span-7">
+        <p class="eyebrow mb-6">Research</p>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-xtight leading-[1.02]">
+          Built on a clear<br/>technical thesis.
+        </h2>
+      </div>
+      <div class="lg:col-span-4 lg:col-start-9 lg:pt-[37px]">
+        <p class="text-white/55 text-base lg:text-lg leading-relaxed mb-8">
+          Read the belto research record for the technical direction behind onboard AI, constrained inference, and orbital edge deployment.
+        </p>
+        <a href="https://zenodo.org/records/19207086" target="_blank" rel="noopener" class="btn-secondary">
+          View Research
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== FINAL CTA ============================== -->
+<section class="relative py-16 lg:py-24">
+  <div class="max-w-[1440px] mx-auto px-6 lg:px-10">
+    <div class="relative grid grid-cols-1 lg:grid-cols-12 gap-px overflow-hidden rounded-2xl reveal">
+      <!-- visual side -->
+      <div class="lg:col-span-4 bg-ink-900 relative min-h-[280px] lg:min-h-[420px] overflow-hidden">
+        <svg viewBox="0 0 400 420" class="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <defs>
+            <pattern id="gridF" width="30" height="30" patternUnits="userSpaceOnUse">
+              <path d="M 30 0 L 0 0 0 30" fill="none" stroke="rgba(255,255,255,.04)" stroke-width=".5"/>
+            </pattern>
+            <radialGradient id="discFill" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="rgba(74,222,128,.18)"/>
+              <stop offset="100%" stop-color="transparent"/>
+            </radialGradient>
+          </defs>
+          <rect width="400" height="420" fill="url(#gridF)"/>
+          <!-- ground station dish -->
+          <g transform="translate(200 220)">
+            <ellipse cx="0" cy="0" rx="120" ry="120" fill="url(#discFill)"/>
+            <ellipse cx="0" cy="0" rx="100" ry="34" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.35)" stroke-width=".8"/>
+            <ellipse cx="0" cy="-2" rx="78" ry="26" fill="none" stroke="rgba(255,255,255,.18)" stroke-width=".5"/>
+            <ellipse cx="0" cy="-4" rx="54" ry="18" fill="none" stroke="rgba(255,255,255,.14)" stroke-width=".5"/>
+            <line x1="0" y1="-3" x2="0" y2="-90" stroke="rgba(255,255,255,.55)" stroke-width="1"/>
+            <rect x="-4" y="-94" width="8" height="8" fill="#15151a" stroke="rgba(255,255,255,.6)" stroke-width=".6"/>
+            <line x1="0" y1="0" x2="0" y2="60" stroke="rgba(255,255,255,.4)" stroke-width="1"/>
+            <line x1="-30" y1="60" x2="30" y2="60" stroke="rgba(255,255,255,.4)" stroke-width="1"/>
+          </g>
+          <!-- incoming downlink path -->
+          <g stroke="rgba(74,222,128,.45)" stroke-width=".8" stroke-dasharray="2 4" fill="none">
+            <path d="M 380 30 Q 280 100 200 130"/>
+          </g>
+          <!-- annotation -->
+          <g fill="rgba(255,255,255,.4)" font-family="mono, mono Fallback, ui-monospace, monospace" font-size="9" letter-spacing=".14em">
+            <text x="20" y="30">GROUND STATION</text>
+            <text x="20" y="44" fill="rgba(255,255,255,.3)">UPLINK · 14:23 UTC</text>
+            <text x="20" y="400" fill="rgba(74,222,128,.8)">◉ ACQUIRED</text>
+          </g>
+          <line x1="20" y1="36" x2="160" y2="36" stroke="rgba(255,255,255,.18)" stroke-width=".5"/>
+        </svg>
+        <span class="absolute top-4 right-4 demo-mono text-[10px] text-white/40 tracking-[.18em]">CONTACT</span>
+      </div>
+
+      <!-- text side -->
+      <div class="lg:col-span-8 bg-moss-700 p-10 lg:p-16 relative">
+        <p class="eyebrow !text-white/55 mb-7">Contact</p>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-xtight leading-[1.02] mb-6 max-w-3xl">
+          Bring onboard AI to<br/>your next mission.
+        </h2>
+        <p class="text-white/75 text-base lg:text-lg max-w-2xl leading-relaxed mb-10">
+          belto is built for teams exploring satellite intelligence, constrained inference, and mission-ready edge AI workflows.
+        </p>
+        <div class="flex flex-wrap items-center gap-3">
+          <a href="https://calendly.com/emil-shirokikh-belto/30min" target="_blank" rel="noopener" class="btn-secondary !bg-white !text-ink-950 !border-white hover:!bg-white/90">
+            Discuss Partnership
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a href="https://space-conquering-hackathon.vercel.app" target="_blank" rel="noopener" class="btn-secondary !bg-transparent !border-white/25 hover:!border-white/45">Try Demo</a>
+        </div>
+        <!-- bracket flourishes -->
+        <span class="absolute top-4 right-4 w-3 h-3 border-t border-r border-white/30"></span>
+        <span class="absolute bottom-4 right-4 w-3 h-3 border-b border-r border-white/30"></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== FOOTER ============================== -->
+<footer class="relative pt-20 pb-10 border-t border-white/[0.06]">
+  <div class="max-w-[1440px] mx-auto px-6 lg:px-10">
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 mb-14">
+      <div class="lg:col-span-5">
+        <a href="/" class="inline-flex items-center gap-2.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-moss-400"></span>
+          <span class="text-xl font-semibold tracking-tight">belto</span>
+        </a>
+        <p class="mt-5 text-white/55 max-w-sm leading-relaxed">Orbital edge AI runtime.</p>
+        <div class="mt-8 inline-flex items-center gap-2 demo-mono text-[10px] text-white/40 tracking-[.18em]">
+          <span class="w-1.5 h-1.5 rounded-full bg-moss-400 pulse-dot"></span>
+          ALL SYSTEMS NOMINAL
+        </div>
+      </div>
+
+      <div class="lg:col-span-4 lg:col-start-9 grid grid-cols-2 gap-10 sm:gap-14">
+        <div>
+          <div class="demo-mono text-[10px] text-white/35 tracking-[.18em] mb-4">PRODUCT</div>
+          <ul class="space-y-3 text-white/70 text-sm">
+            <li><a href="#problem" class="hover:text-white transition">Problem</a></li>
+            <li><a href="#solution" class="hover:text-white transition">Solution</a></li>
+            <li><a href="#product" class="hover:text-white transition">Product</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="demo-mono text-[10px] text-white/35 tracking-[.18em] mb-4">RESOURCES</div>
+          <ul class="space-y-3 text-white/70 text-sm">
+            <li><a href="https://zenodo.org/records/19207086" target="_blank" rel="noopener" class="hover:text-white transition">Research</a></li>
+            <li><a href="https://space-conquering-hackathon.vercel.app" target="_blank" rel="noopener" class="hover:text-white transition">Demo</a></li>
+            <li><a href="https://calendly.com/emil-shirokikh-belto/30min" target="_blank" rel="noopener" class="hover:text-white transition">Contact</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="pt-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 demo-mono text-[11px] text-white/35 tracking-[.14em]">
+      <div>© <span class="cv11">2026</span> belto Inc. All rights reserved.</div>
+      <div class="flex items-center gap-6">
+        <span>v0.3</span>
+        <span>LAT 37.77 · LON −122.41</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Scroll reveal
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        io.unobserve(e.target);
+      }
+    });
+  }, { rootMargin: '0px 0px -80px 0px', threshold: 0.05 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // Use cases carousel
+  (function () {
+    const carousel = document.getElementById('useCarousel');
+    const progress = document.getElementById('carouselProgress');
+    const indexEl = document.getElementById('carouselIndex');
+    const prevBtn = document.getElementById('carouselPrev');
+    const nextBtn = document.getElementById('carouselNext');
+    if (!carousel || !progress) return;
+
+    const cards = () => Array.from(carousel.querySelectorAll('.use-card'));
+    const stepSize = () => {
+      const first = carousel.querySelector('.use-card');
+      const gap = parseInt(getComputedStyle(carousel).columnGap || getComputedStyle(carousel).gap || 16, 10) || 16;
+      return first ? first.offsetWidth + gap : 380;
+    };
+
+    const update = () => {
+      const max = carousel.scrollWidth - carousel.clientWidth;
+      const pct = max > 0 ? (carousel.scrollLeft / max) * 100 : 0;
+      progress.style.width = Math.max(8, Math.min(100, pct)) + '%';
+      if (indexEl) {
+        const list = cards();
+        const left = carousel.scrollLeft + 24;
+        let activeIdx = 0;
+        list.forEach((c, i) => { if (c.offsetLeft <= left + 8) activeIdx = i; });
+        const total = list.length;
+        indexEl.textContent = String(activeIdx + 1).padStart(2, '0');
+        const totalEl = indexEl.nextElementSibling;
+        if (totalEl) totalEl.textContent = ' / ' + String(total).padStart(2, '0');
+      }
+      if (prevBtn) prevBtn.disabled = carousel.scrollLeft <= 2;
+      if (nextBtn) nextBtn.disabled = carousel.scrollLeft >= max - 2;
+    };
+
+    carousel.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+
+    prevBtn?.addEventListener('click', () => carousel.scrollBy({ left: -stepSize(), behavior: 'smooth' }));
+    nextBtn?.addEventListener('click', () => carousel.scrollBy({ left: stepSize(), behavior: 'smooth' }));
+  })();
+</script>
+
+</body>
+</html>
